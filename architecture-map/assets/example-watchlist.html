@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ItemCard — Watchlist Auth & API Map</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #21253a;
+    --border: #2d3148;
+    --text: #e2e8f0;
+    --text-muted: #7c85a2;
+    --accent: #6366f1;
+    --critical: #ef4444;
+    --warning: #f59e0b;
+    --minor: #6366f1;
+    --success: #10b981;
+    --font: system-ui, -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; }
+  #app { display: grid; grid-template-columns: 220px 1fr; grid-template-rows: auto 1fr auto; height: 100vh; }
+
+  /* Header */
+  #header { grid-column: 1/-1; background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 16px; }
+  #header h1 { font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+  #header .subtitle { font-size: 11px; color: var(--text-muted); }
+  .view-tabs { display: flex; gap: 4px; margin-left: auto; }
+  .view-tab { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; font-size: 12px; transition: all 0.15s; }
+  .view-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .view-tab:hover:not(.active) { border-color: var(--accent); color: var(--text); }
+
+  /* Sidebar */
+  #sidebar { background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 14px; }
+  .sidebar-section { }
+  .section-label { font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .preset-btn { padding: 5px 6px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; font-size: 11px; text-align: center; transition: all 0.15s; }
+  .preset-btn:hover { border-color: var(--accent); }
+  .preset-btn.active { border-color: var(--accent); background: rgba(99,102,241,0.15); color: var(--accent); }
+  .toggle-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; }
+  .toggle-row input[type=checkbox] { accent-color: var(--accent); width: 13px; height: 13px; cursor: pointer; }
+  .toggle-row label { cursor: pointer; color: var(--text); font-size: 12px; display: flex; align-items: center; gap: 6px; user-select: none; }
+  .conn-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .comment-item { background: var(--surface2); border-radius: 6px; padding: 8px; margin-bottom: 6px; border-left: 3px solid var(--accent); }
+  .comment-item .comment-target { font-size: 10px; font-weight: 600; color: var(--accent); margin-bottom: 3px; }
+  .comment-item .comment-text { font-size: 11px; color: var(--text); line-height: 1.4; }
+  .comment-item .comment-del { float: right; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; margin-top: -2px; }
+  .comment-item .comment-del:hover { color: var(--critical); }
+  .no-comments { font-size: 11px; color: var(--text-muted); font-style: italic; }
+
+  /* Canvas */
+  #canvas-area { position: relative; background: var(--bg); overflow: hidden; }
+  #canvas { width: 100%; height: 100%; cursor: grab; }
+  #canvas:active { cursor: grabbing; }
+  .zoom-controls { position: absolute; bottom: 12px; right: 12px; display: flex; gap: 4px; }
+  .zoom-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .zoom-btn:hover { border-color: var(--accent); }
+
+  /* Bottom panel */
+  #bottom-panel { grid-column: 1/-1; background: var(--surface); border-top: 1px solid var(--border); max-height: 260px; display: flex; flex-direction: column; }
+  .bottom-tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .bottom-tab { padding: 8px 14px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .bottom-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  #tab-content { flex: 1; overflow-y: auto; padding: 12px; }
+
+  /* Issues */
+  .issue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+  .issue-card { background: var(--surface2); border-radius: 8px; padding: 10px; border-left: 3px solid var(--critical); position: relative; }
+  .issue-card.warning { border-left-color: var(--warning); }
+  .issue-card.minor { border-left-color: var(--minor); }
+  .issue-card:hover { border-color: #4b5563; }
+  .issue-header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+  .issue-badge { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .issue-badge.critical { background: rgba(239,68,68,0.2); color: var(--critical); }
+  .issue-badge.warning { background: rgba(245,158,11,0.2); color: var(--warning); }
+  .issue-badge.minor { background: rgba(99,102,241,0.2); color: var(--minor); }
+  .issue-title { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.3; }
+  .issue-file { font-size: 10px; color: var(--text-muted); font-family: var(--mono); margin-bottom: 5px; }
+  .issue-desc { font-size: 11px; color: #94a3b8; line-height: 1.5; }
+  .highlight-btn { position: absolute; top: 8px; right: 8px; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); background: none; color: var(--text-muted); font-size: 10px; cursor: pointer; }
+  .highlight-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Next steps */
+  .step-list { display: flex; flex-direction: column; gap: 6px; }
+  .step-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; background: var(--surface2); border-radius: 6px; border: 1px solid var(--border); transition: all 0.15s; }
+  .step-item.done { opacity: 0.5; }
+  .step-item.done .step-text { text-decoration: line-through; }
+  .step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; margin-top: 1px; }
+  .step-check { accent-color: var(--success); width: 14px; height: 14px; cursor: pointer; margin-top: 3px; }
+  .step-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .step-code { font-family: var(--mono); font-size: 10px; color: var(--accent); background: rgba(99,102,241,0.1); padding: 1px 5px; border-radius: 3px; white-space: nowrap; }
+
+  /* Prompt */
+  #prompt-area { display: flex; flex-direction: column; gap: 8px; }
+  #prompt-output { font-family: var(--mono); font-size: 11px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; line-height: 1.6; min-height: 80px; flex: 1; }
+  .copy-row { display: flex; justify-content: flex-end; }
+  #copy-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; font-size: 12px; }
+  #copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Modal */
+  #modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+  #modal-overlay.open { display: flex; }
+  #modal { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; width: 380px; }
+  #modal h3 { font-size: 13px; color: var(--text); margin-bottom: 4px; }
+  #modal .modal-sub { font-size: 11px; color: var(--text-muted); font-family: var(--mono); margin-bottom: 12px; }
+  #modal textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 12px; padding: 8px; resize: vertical; min-height: 80px; outline: none; font-family: var(--font); }
+  #modal textarea:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+  .modal-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; font-size: 12px; }
+  .modal-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .modal-btn.secondary { background: none; color: var(--text-muted); }
+
+  /* SVG node styles applied via JS */
+  .node-highlight { filter: drop-shadow(0 0 6px rgba(239,68,68,0.6)); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div>
+      <h1>ItemCard — Watchlist Auth &amp; API Map</h1>
+      <div class="subtitle">Shopping Backend Service flow &amp; auth investigation</div>
+    </div>
+    <div class="view-tabs">
+      <button class="view-tab active" onclick="setView('architecture')">Architecture</button>
+      <button class="view-tab" onclick="setView('sequence')">Sequence Flow</button>
+    </div>
+  </div>
+
+  <div id="sidebar">
+    <div class="sidebar-section">
+      <div class="section-label">Presets</div>
+      <div class="preset-grid">
+        <button class="preset-btn active" onclick="applyPreset('full')">Full System</button>
+        <button class="preset-btn" onclick="applyPreset('itemcard')">ItemCard Flow</button>
+        <button class="preset-btn" onclick="applyPreset('auth')">Auth Focus</button>
+        <button class="preset-btn" onclick="applyPreset('issues')">Issues Only</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section" id="layer-section">
+      <div class="section-label">Layers</div>
+      <div class="toggle-row"><input type="checkbox" id="l-client-ui" checked onchange="toggleLayer('client-ui', this.checked)"><label for="l-client-ui">Client Components</label></div>
+      <div class="toggle-row"><input type="checkbox" id="l-client-api" checked onchange="toggleLayer('client-api', this.checked)"><label for="l-client-api">Client API Calls</label></div>
+      <div class="toggle-row"><input type="checkbox" id="l-bff" checked onchange="toggleLayer('bff', this.checked)"><label for="l-bff">BFF / Next.js API</label></div>
+      <div class="toggle-row"><input type="checkbox" id="l-external" checked onchange="toggleLayer('external', this.checked)"><label for="l-external">External Services</label></div>
+    </div>
+
+    <div class="sidebar-section" id="conn-section">
+      <div class="section-label">Connections</div>
+      <div class="toggle-row"><input type="checkbox" id="c-dependency" checked onchange="toggleConn('dependency', this.checked)"><label for="c-dependency"><span class="conn-dot" style="background:#6b7280"></span>Renders / Imports</label></div>
+      <div class="toggle-row"><input type="checkbox" id="c-tool-call" checked onchange="toggleConn('tool-call', this.checked)"><label for="c-tool-call"><span class="conn-dot" style="background:#10b981"></span>Function Calls</label></div>
+      <div class="toggle-row"><input type="checkbox" id="c-data-flow" checked onchange="toggleConn('data-flow', this.checked)"><label for="c-data-flow"><span class="conn-dot" style="background:#3b82f6"></span>API / Data Flow</label></div>
+      <div class="toggle-row"><input type="checkbox" id="c-event" checked onchange="toggleConn('event', this.checked)"><label for="c-event"><span class="conn-dot" style="background:#ef4444"></span>Auth Redirect</label></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label">Comments (<span id="comment-count">0</span>)</div>
+      <div id="comments-list"><div class="no-comments">Click any node to add a comment</div></div>
+    </div>
+  </div>
+
+  <div id="canvas-area">
+    <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoom(1.25)" title="Zoom in">+</button>
+      <button class="zoom-btn" onclick="zoom(0.8)" title="Zoom out">−</button>
+      <button class="zoom-btn" onclick="resetView()" title="Reset view">⌖</button>
+    </div>
+  </div>
+
+  <div id="bottom-panel">
+    <div class="bottom-tabs">
+      <div class="bottom-tab active" onclick="setTab('issues')">Issues &amp; Observations (5)</div>
+      <div class="bottom-tab" onclick="setTab('steps')">Next Steps (4)</div>
+      <div class="bottom-tab" onclick="setTab('prompt')">Prompt Output</div>
+    </div>
+    <div id="tab-content"></div>
+  </div>
+</div>
+
+<div id="modal-overlay">
+  <div id="modal">
+    <h3 id="modal-title">Add Comment</h3>
+    <div class="modal-sub" id="modal-sub"></div>
+    <textarea id="modal-input" placeholder="Your observations, questions, or proposed changes…"></textarea>
+    <div class="modal-actions">
+      <button class="modal-btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn primary" onclick="saveComment()">Save Comment</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+
+const NODES = [
+  // Client UI
+  { id: 'item-card',       label: 'ItemCard',                    sub: 'libs/shared-components/…/ItemCard/',                        x: 30,  y: 40,  w: 130, h: 48, layer: 'client-ui',  issues: [5], hasTests: true,  testFile: 'libs/shared-components/…/ItemCard/ItemCard.test.tsx' },
+  { id: 'watchlist-btn',   label: 'AddToWatchlist\nButtonNewUI', sub: 'libs/shared-components/…/ItemCard/\nAddToWatchlistButtonNewUI.tsx', x: 200, y: 32,  w: 190, h: 58, layer: 'client-ui',  issues: [3], hasTests: true,  testFile: 'libs/shared-components/…/ItemCard/AddToWatchlistButtonNewUI.test.tsx' },
+  { id: 'use-user',        label: 'useUser()',                   sub: '@auth0/nextjs-auth0/client',                                x: 430, y: 42,  w: 125, h: 45, layer: 'client-ui',  issues: [], hasTests: false },
+  { id: 'redirect-unauth', label: 'redirectIfNot\nAuthenticated()', sub: '@experience-marketplace/utils',                         x: 590, y: 42,  w: 175, h: 45, layer: 'client-ui',  issues: [], hasTests: false },
+  // Client API
+  { id: 'add-items',    label: 'addWatchlistItems()',    sub: 'libs/api-client/…/watchlist/\naddWatchlistItems.ts',    x: 200, y: 148, w: 170, h: 48, layer: 'client-api', issues: [], hasTests: false },
+  { id: 'delete-items', label: 'deleteWatchlistItems()', sub: 'libs/api-client/…/watchlist/\ndeleteWatchlistItems.ts', x: 395, y: 148, w: 180, h: 48, layer: 'client-api', issues: [], hasTests: false },
+  // BFF
+  { id: 'handler-wrapper',  label: 'handlerWrapper',          sub: 'libs/api-client/src/handlers/\nhandlerWrapper.ts',                            x: 30,  y: 258, w: 158, h: 50, layer: 'bff', issues: [4], hasTests: false },
+  { id: 'api-route',        label: '/api/watchlistItems',      sub: 'apps/shell/pages/api/\nwatchlistItems.ts',                                    x: 222, y: 252, w: 158, h: 55, layer: 'bff', issues: [2], hasTests: false },
+  { id: 'change-handler',   label: 'changeWatchlist\nHandler', sub: 'apps/account/utils/ssr/\nchangeWatchlistHandler/\nchangeWatchlistHandler.ts', x: 415, y: 248, w: 185, h: 60, layer: 'bff', issues: [1], hasTests: true,  testFile: 'apps/account/utils/ssr/changeWatchlistHandler/changeWatchlistHandler.test.ts' },
+  { id: 'get-token',        label: 'getAccessToken()',         sub: '@auth0/nextjs-auth0',                                                        x: 640, y: 258, w: 145, h: 50, layer: 'bff', issues: [], hasTests: false },
+  // External
+  { id: 'auth0',          label: 'Auth0 Session',            sub: 'auth0.com',                                                                   x: 640, y: 378, w: 145, h: 48, layer: 'external', issues: [], hasTests: false },
+  { id: 'shopping-svc',   label: 'Shopping Backend\nService', sub: 'watchlist.watchlist-*\n.svc.cluster.local:8080',                              x: 398, y: 372, w: 185, h: 55, layer: 'external', issues: [], hasTests: false },
+  { id: 'legacy-appsync', label: 'BidBuy GraphQL\n(Legacy)',  sub: 'AWS AppSync\n(WATCHLIST_API_URL_FROM_BID_BUY)',                               x: 30,  y: 378, w: 172, h: 52, layer: 'external', issues: [], hasTests: false },
+];
+
+// ─── REFERENCES (who imports the entry component) ─────────────────────────────
+// Produced by Step 2.5. Excludes *.test.* / *.spec.* / __tests__ paths.
+const REFERENCES = [
+  {
+    nodeId: 'watchlist-btn',
+    importers: [
+      { file: 'libs/shared-components/src/ItemCard/ItemCard.tsx', line: 14 },
+      { file: 'apps/shell/src/components/SearchResults/SearchResultCard.tsx', line: 22 },
+      { file: 'apps/shell/src/pages/my-watchlist.tsx', line: 31 },
+    ],
+    truncated: false,
+    totalCount: 3,
+  },
+];
+
+// ─── CHILD TREE (render-only tree rooted at entry) ────────────────────────────
+// Produced by Step 2.7. Depth cap 4. External = library component, don't descend.
+const CHILD_TREE = {
+  rootId: 'watchlist-btn',
+  nodes: [
+    { id: 'watchlist-btn', label: 'AddToWatchlistButtonNewUI', file: 'libs/shared-components/…/AddToWatchlistButtonNewUI.tsx', hasTests: true,  children: ['icon-btn', 'tooltip-wrap', 'loading-spinner'] },
+    { id: 'icon-btn',       label: 'IconButton',    file: '@mui/material',   hasTests: false, external: true,  children: [] },
+    { id: 'tooltip-wrap',   label: 'Tooltip',       file: '@mui/material',   hasTests: false, external: true,  children: [] },
+    { id: 'loading-spinner', label: 'CircularProgress', file: '@mui/material', hasTests: false, external: true, children: [] },
+  ],
+};
+
+const CONNECTIONS = [
+  { from: 'item-card',       to: 'watchlist-btn',   type: 'dependency', label: 'renders' },
+  { from: 'watchlist-btn',   to: 'use-user',        type: 'tool-call',  label: 'useUser()' },
+  { from: 'watchlist-btn',   to: 'redirect-unauth', type: 'event',      label: 'if !user' },
+  { from: 'watchlist-btn',   to: 'add-items',       type: 'tool-call',  label: 'on add' },
+  { from: 'watchlist-btn',   to: 'delete-items',    type: 'tool-call',  label: 'on remove' },
+  { from: 'add-items',       to: 'api-route',       type: 'data-flow',  label: 'POST' },
+  { from: 'delete-items',    to: 'api-route',       type: 'data-flow',  label: 'DELETE' },
+  { from: 'api-route',       to: 'handler-wrapper', type: 'dependency', label: 'wraps' },
+  { from: 'api-route',       to: 'change-handler',  type: 'tool-call',  label: 'delegates' },
+  { from: 'change-handler',  to: 'get-token',       type: 'tool-call',  label: 'getAccessToken' },
+  { from: 'get-token',       to: 'auth0',           type: 'data-flow',  label: 'reads session' },
+  { from: 'change-handler',  to: 'shopping-svc',    type: 'data-flow',  label: 'Bearer token' },
+];
+
+const ISSUES = [
+  {
+    id: 1, severity: 'critical',
+    title: 'Silent 200 on missing auth token',
+    file: 'changeWatchlistHandler.ts:53',
+    nodeId: 'change-handler',
+    desc: 'When getAccessToken() returns no token, the handler calls res.end() with no status code — defaulting to 200. The client receives an empty successful response and addWatchlistItems() returns { success: true }. The UI marks the item as watched without it actually being saved.',
+  },
+  {
+    id: 2, severity: 'critical',
+    title: 'No withApiAuthRequired middleware',
+    file: 'apps/shell/pages/api/watchlistItems.ts',
+    nodeId: 'api-route',
+    desc: 'The route re-exports changeWatchlistHandler directly. Auth0\'s withApiAuthRequired wrapper is never applied, so unauthenticated requests reach the handler and rely on manual token checks that fail silently (see Issue #1).',
+  },
+  {
+    id: 3, severity: 'warning',
+    title: 'Client-side auth check is optimistic',
+    file: 'AddToWatchlistButtonNewUI.tsx:83,113',
+    nodeId: 'watchlist-btn',
+    desc: 'The component gates API calls on useUser() — a client-side session snapshot. If the Auth0 session expires between page load and click, the check passes but the BFF call fails silently. There is no re-auth flow triggered on a 401 from the server (which also never arrives — see Issue #1).',
+  },
+  {
+    id: 4, severity: 'warning',
+    title: 'handlerWrapper has no auth layer',
+    file: 'libs/api-client/src/handlers/handlerWrapper.ts',
+    nodeId: 'handler-wrapper',
+    desc: 'The shared wrapper only handles error formatting, tracing (addCustomerIdAttributeToCurrentSpan), and Cache-Control headers. It enforces no authentication. Each individual handler must implement its own auth, leading to inconsistency across the codebase.',
+  },
+  {
+    id: 5, severity: 'minor',
+    title: 'PRICE_TYPE enum violates project convention',
+    file: 'libs/shared-components/…/ItemCard/',
+    nodeId: 'item-card',
+    desc: 'ItemCard exports a TypeScript enum (PRICE_TYPE). Project convention (CLAUDE.md) requires union types over enums — enums produce runtime JavaScript and have quirky structural typing behavior. Should be type PRICE_TYPE = "BUY_NOW" | "AUCTION" | …',
+  },
+];
+
+const NEXT_STEPS = [
+  { id: 1, text: 'Return 401 instead of silent res.end() — In changeWatchlistHandler.ts:53, replace res.end() with res.status(401).json({ error: "Unauthorized" }) when accessToken is falsy.', code: 'changeWatchlistHandler.ts:53' },
+  { id: 2, text: 'Handle 401 on the client — In addWatchlistItems.ts and deleteWatchlistItems.ts, detect 401 responses and trigger a re-auth redirect rather than returning { success: false }.', code: 'addWatchlistItems.ts' },
+  { id: 3, text: 'Add auth middleware — Wrap mutating watchlist routes with Auth0\'s withApiAuthRequired, or create a shared withAuth HOF applied at the route level to enforce authentication consistently.', code: 'withApiAuthRequired' },
+  { id: 4, text: 'Audit parallel handlers — Apply the same 401 fix to watchlistGetHandler.ts, watchlistHandler.ts, and watchlistItemByAssetIdHandler.ts which share the same silent-fail pattern.', code: 'watchlistGetHandler.ts' },
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+
+const state = {
+  view: 'architecture',
+  layers: { 'client-ui': true, 'client-api': true, bff: true, external: true },
+  conns: { dependency: true, 'tool-call': true, 'data-flow': true, event: true },
+  comments: [],
+  highlighted: null,
+  tab: 'issues',
+  stepsDone: [],
+  scale: 1,
+  tx: 0,
+  ty: 0,
+  dragging: false,
+  dragStart: null,
+  pendingNode: null,
+};
+
+// ─── COLOURS ─────────────────────────────────────────────────────────────────
+
+const LAYER_COLORS = {
+  'client-ui':  { fill: '#1e2a3a', stroke: '#3b82f6', text: '#93c5fd' },
+  'client-api': { fill: '#231d35', stroke: '#8b5cf6', text: '#c4b5fd' },
+  bff:          { fill: '#2a2314', stroke: '#f59e0b', text: '#fcd34d' },
+  external:     { fill: '#142218', stroke: '#10b981', text: '#6ee7b7' },
+};
+
+const CONN_COLORS = {
+  dependency: '#6b7280',
+  'tool-call': '#10b981',
+  'data-flow': '#3b82f6',
+  event: '#ef4444',
+};
+
+const LAYER_BAND = {
+  'client-ui':  { y: 15,  h: 105 },
+  'client-api': { y: 130, h: 80  },
+  bff:          { y: 222, h: 105 },
+  external:     { y: 340, h: 100 },
+};
+
+const LAYER_LABELS = {
+  'client-ui':  'CLIENT\nCOMPONENTS',
+  'client-api': 'CLIENT\nAPI CALLS',
+  bff:          'BFF /\nNEXT.JS API',
+  external:     'EXTERNAL\nSERVICES',
+};
+
+// ─── SVG HELPERS ─────────────────────────────────────────────────────────────
+
+function svgEl(tag, attrs = {}, ...children) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  for (const c of children) if (c) el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  return el;
+}
+
+function nodeCenter(n) { return { x: n.x + n.w / 2, y: n.y + n.h / 2 }; }
+
+function edgePoint(n, dir) {
+  const c = nodeCenter(n);
+  if (dir === 'bottom') return { x: c.x, y: n.y + n.h };
+  if (dir === 'top')    return { x: c.x, y: n.y };
+  if (dir === 'right')  return { x: n.x + n.w, y: c.y };
+  if (dir === 'left')   return { x: n.x, y: c.y };
+  return c;
+}
+
+function bestEdges(a, b) {
+  const ac = nodeCenter(a), bc = nodeCenter(b);
+  const dx = bc.x - ac.x, dy = bc.y - ac.y;
+  if (Math.abs(dy) > Math.abs(dx) * 0.7) {
+    return dy > 0 ? ['bottom', 'top'] : ['top', 'bottom'];
+  }
+  return dx > 0 ? ['right', 'left'] : ['left', 'right'];
+}
+
+function cubicPath(p1, p2, d1, d2) {
+  const offset = 60;
+  let c1x = p1.x, c1y = p1.y, c2x = p2.x, c2y = p2.y;
+  if (d1 === 'bottom') c1y += offset;
+  if (d1 === 'top')    c1y -= offset;
+  if (d1 === 'right')  c1x += offset;
+  if (d1 === 'left')   c1x -= offset;
+  if (d2 === 'bottom') c2y += offset;
+  if (d2 === 'top')    c2y -= offset;
+  if (d2 === 'right')  c2x += offset;
+  if (d2 === 'left')   c2x -= offset;
+  return `M ${p1.x} ${p1.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
+}
+
+// ─── ARCHITECTURE RENDER ─────────────────────────────────────────────────────
+
+function renderArchitecture() {
+  const svg = document.getElementById('canvas');
+  svg.innerHTML = '';
+
+  const VW = 820, VH = 470;
+  svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
+
+  const g = svgEl('g', { id: 'root', transform: `translate(${state.tx}, ${state.ty}) scale(${state.scale})` });
+  svg.appendChild(g);
+
+  // Defs (arrowheads)
+  const defs = svgEl('defs');
+  for (const [type, color] of Object.entries(CONN_COLORS)) {
+    const marker = svgEl('marker', { id: `arrow-${type}`, markerWidth: '8', markerHeight: '6', refX: '7', refY: '3', orient: 'auto' });
+    marker.appendChild(svgEl('polygon', { points: '0 0, 8 3, 0 6', fill: color }));
+    defs.appendChild(marker);
+  }
+  g.appendChild(defs);
+
+  // Layer bands
+  for (const [layer, band] of Object.entries(LAYER_BAND)) {
+    if (!state.layers[layer]) continue;
+    const colors = LAYER_COLORS[layer];
+    const bg = svgEl('rect', { x: 0, y: band.y, width: VW, height: band.h, fill: colors.fill, opacity: '0.3', rx: '6' });
+    g.appendChild(bg);
+    // Layer label
+    const labelLines = LAYER_LABELS[layer].split('\n');
+    const labelG = svgEl('g');
+    labelLines.forEach((line, i) => {
+      const t = svgEl('text', { x: '6', y: String(band.y + 16 + i * 13), fill: colors.text, 'font-size': '9', 'font-weight': '700', 'letter-spacing': '0.5', opacity: '0.7' });
+      t.textContent = line;
+      labelG.appendChild(t);
+    });
+    g.appendChild(labelG);
+  }
+
+  // Connections (drawn behind nodes)
+  for (const conn of CONNECTIONS) {
+    if (!state.conns[conn.type]) continue;
+    const fromNode = NODES.find(n => n.id === conn.from);
+    const toNode   = NODES.find(n => n.id === conn.to);
+    if (!fromNode || !toNode) continue;
+    if (!state.layers[fromNode.layer] || !state.layers[toNode.layer]) continue;
+
+    const [d1, d2] = bestEdges(fromNode, toNode);
+    const p1 = edgePoint(fromNode, d1);
+    const p2 = edgePoint(toNode, d2);
+    const color = CONN_COLORS[conn.type];
+    const isDashed = conn.type === 'dependency' || conn.type === 'event';
+
+    const path = svgEl('path', {
+      d: cubicPath(p1, p2, d1, d2),
+      fill: 'none',
+      stroke: color,
+      'stroke-width': '1.5',
+      'stroke-dasharray': isDashed ? '5,3' : 'none',
+      'marker-end': `url(#arrow-${conn.type})`,
+      opacity: '0.7',
+    });
+    g.appendChild(path);
+
+    // Connection label
+    if (conn.label) {
+      const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+      const bg = svgEl('rect', { x: mx - 20, y: my - 8, width: 40, height: 13, fill: '#0f1117', rx: '3' });
+      const lt = svgEl('text', { x: String(mx), y: String(my + 1), fill: color, 'font-size': '9', 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
+      lt.textContent = conn.label;
+      g.appendChild(bg);
+      g.appendChild(lt);
+    }
+  }
+
+  // Nodes
+  for (const node of NODES) {
+    if (!state.layers[node.layer]) continue;
+    const colors = LAYER_COLORS[node.layer];
+    const hasIssue = node.issues.length > 0;
+    const isHighlighted = state.highlighted === node.id;
+    const hasComment = state.comments.some(c => c.target === node.id);
+
+    const ng = svgEl('g', { style: 'cursor:pointer', id: `node-${node.id}` });
+    ng.addEventListener('click', () => openModal(node));
+
+    // Node rect
+    const rect = svgEl('rect', {
+      x: String(node.x), y: String(node.y), width: String(node.w), height: String(node.h),
+      fill: colors.fill, stroke: isHighlighted ? '#ef4444' : (hasIssue ? '#92400e' : colors.stroke),
+      'stroke-width': isHighlighted ? '2.5' : '1.5', rx: '7',
+    });
+    if (isHighlighted) rect.setAttribute('filter', 'url(#glow-red)');
+    ng.appendChild(rect);
+
+    // Node label
+    const lines = node.label.split('\n');
+    const lineH = 13;
+    const totalH = lines.length * lineH;
+    const startY = node.y + node.h / 2 - totalH / 2 + 9;
+    lines.forEach((line, i) => {
+      const t = svgEl('text', {
+        x: String(node.x + node.w / 2),
+        y: String(startY + i * lineH),
+        fill: colors.text,
+        'font-size': '11',
+        'font-weight': '600',
+        'text-anchor': 'middle',
+        'dominant-baseline': 'middle',
+      });
+      t.textContent = line;
+      ng.appendChild(t);
+    });
+
+    // Issue badges
+    node.issues.forEach((issueId, i) => {
+      const issue = ISSUES.find(iss => iss.id === issueId);
+      const bx = node.x + node.w - 11 - i * 15;
+      const by = node.y - 6;
+      const badgeColor = issue?.severity === 'critical' ? '#ef4444' : issue?.severity === 'warning' ? '#f59e0b' : '#6366f1';
+      const circle = svgEl('circle', { cx: String(bx), cy: String(by), r: '7', fill: badgeColor });
+      const bt = svgEl('text', { x: String(bx), y: String(by + 1), fill: '#fff', 'font-size': '8', 'font-weight': '700', 'text-anchor': 'middle', 'dominant-baseline': 'middle' });
+      bt.textContent = String(issueId);
+      ng.appendChild(circle);
+      ng.appendChild(bt);
+    });
+
+    // Comment indicator
+    if (hasComment) {
+      const ci = svgEl('text', { x: String(node.x + 5), y: String(node.y + 5), fill: '#6366f1', 'font-size': '10' });
+      ci.textContent = '💬';
+      ng.appendChild(ci);
+    }
+
+    g.appendChild(ng);
+  }
+
+  // Glow filter for highlighted
+  const defsEl = g.querySelector('defs');
+  const filter = svgEl('filter', { id: 'glow-red' });
+  const feGlow = svgEl('feDropShadow', { dx: '0', dy: '0', stdDeviation: '4', 'flood-color': '#ef4444', 'flood-opacity': '0.6' });
+  filter.appendChild(feGlow);
+  defsEl.appendChild(filter);
+
+  setupDrag(svg);
+}
+
+// ─── SEQUENCE RENDER ─────────────────────────────────────────────────────────
+
+function renderSequence() {
+  const svg = document.getElementById('canvas');
+  svg.innerHTML = '';
+
+  const VW = 820, VH = 520;
+  svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
+
+  const g = svgEl('g', { id: 'root', transform: `translate(${state.tx}, ${state.ty}) scale(${state.scale})` });
+  svg.appendChild(g);
+
+  const actors = [
+    { id: 'user',            label: 'User\n(Browser)',        x: 60 },
+    { id: 'btn',             label: 'AddToWatchlist\nButtonNewUI', x: 185 },
+    { id: 'client-fn',       label: 'addWatchlist\nItems()',  x: 320 },
+    { id: 'api',             label: '/api/watchlist\nItems',  x: 450 },
+    { id: 'handler',         label: 'changeWatchlist\nHandler', x: 565 },
+    { id: 'auth0',           label: 'Auth0\nSession',         x: 680 },
+    { id: 'shopping',        label: 'Shopping\nBackend',      x: 780 },
+  ];
+
+  const LIFELINE_TOP = 70;
+  const LIFELINE_BOTTOM = 490;
+  const HEADER_H = 60;
+
+  // Actor headers
+  for (const actor of actors) {
+    const rect = svgEl('rect', { x: String(actor.x - 45), y: '8', width: '90', height: HEADER_H, fill: '#1a1d27', stroke: '#2d3148', 'stroke-width': '1', rx: '6' });
+    g.appendChild(rect);
+    const lines = actor.label.split('\n');
+    lines.forEach((line, i) => {
+      const t = svgEl('text', { x: String(actor.x), y: String(24 + i * 14), fill: '#e2e8f0', 'font-size': '10', 'font-weight': '600', 'text-anchor': 'middle' });
+      t.textContent = line;
+      g.appendChild(t);
+    });
+
+    // Lifeline
+    const ll = svgEl('line', { x1: String(actor.x), y1: String(LIFELINE_TOP), x2: String(actor.x), y2: String(LIFELINE_BOTTOM), stroke: '#2d3148', 'stroke-width': '1.5', 'stroke-dasharray': '4,3' });
+    g.appendChild(ll);
+  }
+
+  // Arrow helper
+  function drawArrow(fromX, toX, y, label, color = '#3b82f6', style = 'solid', note = null) {
+    const isReturn = toX < fromX;
+    const arrowId = `arr-${Math.random().toString(36).slice(2,6)}`;
+    const defs = g.querySelector('defs') || (() => { const d = svgEl('defs'); g.insertBefore(d, g.firstChild); return d; })();
+    const marker = svgEl('marker', { id: arrowId, markerWidth: '8', markerHeight: '6', refX: '7', refY: '3', orient: 'auto' });
+    marker.appendChild(svgEl('polygon', { points: '0 0, 8 3, 0 6', fill: color }));
+    defs.appendChild(marker);
+
+    const line = svgEl('line', {
+      x1: String(fromX), y1: String(y), x2: String(toX + (isReturn ? 8 : -8)), y2: String(y),
+      stroke: color, 'stroke-width': '1.5',
+      'stroke-dasharray': style === 'dashed' ? '5,3' : 'none',
+      'marker-end': `url(#${arrowId})`,
+    });
+    g.appendChild(line);
+
+    if (label) {
+      const mx = (fromX + toX) / 2;
+      const bg = svgEl('rect', { x: String(mx - 45), y: String(y - 13), width: '90', height: '12', fill: '#0f1117', rx: '2' });
+      const lt = svgEl('text', { x: String(mx), y: String(y - 4), fill: color, 'font-size': '9', 'text-anchor': 'middle' });
+      lt.textContent = label;
+      g.appendChild(bg);
+      g.appendChild(lt);
+    }
+
+    if (note) {
+      const issue = ISSUES.find(i => i.id === note);
+      const badgeX = (fromX + toX) / 2 + 50;
+      const noteColor = issue?.severity === 'critical' ? '#ef4444' : '#f59e0b';
+      const nr = svgEl('rect', { x: String(badgeX - 2), y: String(y - 14), width: '70', height: '15', fill: 'rgba(239,68,68,0.15)', stroke: noteColor, 'stroke-width': '1', rx: '3' });
+      const nt = svgEl('text', { x: String(badgeX + 33), y: String(y - 4), fill: noteColor, 'font-size': '9', 'text-anchor': 'middle' });
+      nt.textContent = `⚠ Issue #${note}`;
+      g.appendChild(nr);
+      g.appendChild(nt);
+    }
+  }
+
+  function drawBlock(actorX, yTop, yBot, color) {
+    const block = svgEl('rect', { x: String(actorX - 5), y: String(yTop), width: '10', height: String(yBot - yTop), fill: color, opacity: '0.3', rx: '2' });
+    g.appendChild(block);
+  }
+
+  function label(y, text, color = '#7c85a2') {
+    const t = svgEl('text', { x: '4', y: String(y), fill: color, 'font-size': '9', 'font-weight': '600' });
+    t.textContent = text;
+    g.appendChild(t);
+  }
+
+  function divider(y, text) {
+    const line = svgEl('line', { x1: '0', y1: String(y), x2: String(VW), y2: String(y), stroke: '#2d3148', 'stroke-width': '1', 'stroke-dasharray': '2,4' });
+    const bg = svgEl('rect', { x: String(VW/2 - 80), y: String(y - 8), width: '160', height: '14', fill: '#1a1d27', rx: '3' });
+    const t = svgEl('text', { x: String(VW/2), y: String(y + 2), fill: '#4b5563', 'font-size': '9', 'text-anchor': 'middle', 'font-style': 'italic' });
+    t.textContent = text;
+    g.appendChild(line);
+    g.appendChild(bg);
+    g.appendChild(t);
+  }
+
+  const ax = {};
+  actors.forEach(a => { ax[a.id] = a.x; });
+
+  // Step 1: click
+  drawArrow(ax.user, ax.btn, 100, 'click watchlist button', '#e2e8f0');
+  drawBlock(ax.btn, 100, 490, '#3b82f6');
+
+  // Step 2: check user
+  const selfY = 120;
+  const selfCircle = svgEl('path', { d: `M ${ax.btn} ${selfY} C ${ax.btn+30} ${selfY}, ${ax.btn+30} ${selfY+18}, ${ax.btn} ${selfY+18}`, fill: 'none', stroke: '#10b981', 'stroke-width': '1.5' });
+  g.appendChild(selfCircle);
+  const selfT = svgEl('text', { x: String(ax.btn + 35), y: String(selfY + 10), fill: '#10b981', 'font-size': '9' });
+  selfT.textContent = 'check useUser()';
+  g.appendChild(selfT);
+
+  divider(143, '— Branch: user found (happy path) —');
+
+  // Step 3: call addWatchlistItems
+  drawArrow(ax.btn, ax['client-fn'], 160, 'addWatchlistItems({ assetGUID })', '#10b981');
+  drawBlock(ax['client-fn'], 160, 300, '#10b981');
+
+  // Step 4: POST
+  drawArrow(ax['client-fn'], ax.api, 180, 'POST /api/watchlistItems', '#3b82f6');
+  drawBlock(ax.api, 180, 290, '#f59e0b');
+
+  // Step 5: delegate
+  drawArrow(ax.api, ax.handler, 200, 'changeWatchlistHandler()', '#10b981');
+  drawBlock(ax.handler, 200, 280, '#f59e0b');
+
+  // Step 6: getAccessToken
+  drawArrow(ax.handler, ax.auth0, 220, 'getAccessToken(req, res)', '#10b981');
+  drawBlock(ax.auth0, 220, 250, '#10b981');
+
+  divider(248, '— Branch A: no token returned —');
+
+  // Issue path
+  label(265, '⚠ Issue #1:', '#ef4444');
+  drawArrow(ax.auth0, ax.handler, 268, '{ accessToken: undefined }', '#ef4444', 'dashed');
+  const issueRect = svgEl('rect', { x: String(ax.handler - 60), y: '272', width: '120', height: '24', fill: 'rgba(239,68,68,0.1)', stroke: '#ef4444', 'stroke-width': '1', rx: '3' });
+  const issueT = svgEl('text', { x: String(ax.handler), y: '286', fill: '#ef4444', 'font-size': '9', 'text-anchor': 'middle' });
+  issueT.textContent = 'res.end()  →  200 empty body';
+  g.appendChild(issueRect);
+  g.appendChild(issueT);
+
+  drawArrow(ax.handler, ax['client-fn'], 310, '200 {} (silent success!)', '#ef4444', 'dashed');
+  drawArrow(ax['client-fn'], ax.btn, 330, '{ success: true }  ← FALSE', '#ef4444', 'dashed');
+  const uiWrong = svgEl('text', { x: String(ax.btn - 44), y: '352', fill: '#ef4444', 'font-size': '9' });
+  uiWrong.textContent = '❌ UI shows "watched" — item NOT saved';
+  g.appendChild(uiWrong);
+
+  divider(370, '— Branch B: token found (correct path) —');
+
+  drawArrow(ax.auth0, ax.handler, 390, '{ accessToken: "ey…" }', '#10b981', 'dashed');
+  drawArrow(ax.handler, ax.shopping, 415, 'POST /v1/watchlist/items  Bearer token', '#3b82f6');
+  drawBlock(ax.shopping, 415, 440, '#10b981');
+  drawArrow(ax.shopping, ax.handler, 443, '200 OK', '#10b981', 'dashed');
+  drawArrow(ax.handler, ax.api, 460, 'res.status(200).json({})', '#10b981', 'dashed');
+  drawArrow(ax.api, ax['client-fn'], 477, '200 {}', '#10b981', 'dashed');
+  drawArrow(ax['client-fn'], ax.btn, 494, '{ success: true }', '#10b981', 'dashed');
+  const uiOk = svgEl('text', { x: String(ax.btn - 44), y: '510', fill: '#10b981', 'font-size': '9' });
+  uiOk.textContent = '✓ UI updates correctly';
+  g.appendChild(uiOk);
+
+  setupDrag(svg);
+}
+
+// ─── DRAG / ZOOM ─────────────────────────────────────────────────────────────
+
+function setupDrag(svg) {
+  svg.onmousedown = (e) => {
+    if (e.target.closest('[id^=node-]')) return;
+    state.dragging = true;
+    state.dragStart = { x: e.clientX - state.tx, y: e.clientY - state.ty };
+  };
+  svg.onmousemove = (e) => {
+    if (!state.dragging) return;
+    state.tx = e.clientX - state.dragStart.x;
+    state.ty = e.clientY - state.dragStart.y;
+    updateTransform();
+  };
+  svg.onmouseup = () => { state.dragging = false; };
+  svg.onmouseleave = () => { state.dragging = false; };
+  svg.onwheel = (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    state.scale = Math.max(0.3, Math.min(3, state.scale * factor));
+    updateTransform();
+  };
+}
+
+function updateTransform() {
+  const root = document.getElementById('root');
+  if (root) root.setAttribute('transform', `translate(${state.tx}, ${state.ty}) scale(${state.scale})`);
+}
+
+function zoom(f) {
+  state.scale = Math.max(0.3, Math.min(3, state.scale * f));
+  updateTransform();
+}
+
+function resetView() {
+  state.scale = 1; state.tx = 0; state.ty = 0;
+  updateTransform();
+}
+
+// ─── CONTROLS ────────────────────────────────────────────────────────────────
+
+function setView(v) {
+  state.view = v;
+  state.scale = 1; state.tx = 0; state.ty = 0;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.textContent.toLowerCase().startsWith(v)));
+  document.getElementById('layer-section').style.display = v === 'sequence' ? 'none' : '';
+  document.getElementById('conn-section').style.display  = v === 'sequence' ? 'none' : '';
+  render();
+}
+
+function toggleLayer(layer, on) {
+  state.layers[layer] = on;
+  render();
+}
+
+function toggleConn(type, on) {
+  state.conns[type] = on;
+  render();
+}
+
+function applyPreset(name) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.getAttribute('onclick').includes(`'${name}'`)));
+  const L = state.layers, C = state.conns;
+  if (name === 'full') {
+    Object.keys(L).forEach(k => L[k] = true);
+    Object.keys(C).forEach(k => C[k] = true);
+  } else if (name === 'itemcard') {
+    L['client-ui'] = true; L['client-api'] = true; L.bff = true; L.external = false;
+    Object.keys(C).forEach(k => C[k] = true);
+  } else if (name === 'auth') {
+    L['client-ui'] = true; L['client-api'] = false; L.bff = true; L.external = true;
+    C.dependency = false; C['tool-call'] = true; C['data-flow'] = true; C.event = true;
+  } else if (name === 'issues') {
+    Object.keys(L).forEach(k => L[k] = true);
+    Object.keys(C).forEach(k => C[k] = false);
+    C.dependency = false;
+    // Highlight all issue nodes
+    state.highlighted = null;
+  }
+  // Sync checkboxes
+  Object.entries(L).forEach(([k, v]) => { const el = document.getElementById(`l-${k}`); if (el) el.checked = v; });
+  Object.entries(C).forEach(([k, v]) => { const el = document.getElementById(`c-${k}`); if (el) el.checked = v; });
+  render();
+}
+
+// ─── MODAL / COMMENTS ────────────────────────────────────────────────────────
+
+function openModal(node) {
+  state.pendingNode = node;
+  document.getElementById('modal-title').textContent = node.label.replace('\n', ' ');
+  document.getElementById('modal-sub').textContent = node.sub.replace(/\n/g, ' • ');
+  document.getElementById('modal-input').value = '';
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('modal-input').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  state.pendingNode = null;
+}
+
+function saveComment() {
+  const text = document.getElementById('modal-input').value.trim();
+  if (!text) return closeModal();
+  state.comments.push({ id: Date.now(), target: state.pendingNode.id, targetLabel: state.pendingNode.label.replace('\n', ' '), targetFile: state.pendingNode.sub.replace(/\n/g, ' '), text });
+  closeModal();
+  renderComments();
+  render();
+  updatePrompt();
+}
+
+function deleteComment(id) {
+  state.comments = state.comments.filter(c => c.id !== id);
+  renderComments();
+  render();
+  updatePrompt();
+}
+
+function renderComments() {
+  const list = document.getElementById('comments-list');
+  document.getElementById('comment-count').textContent = state.comments.length;
+  if (!state.comments.length) {
+    list.innerHTML = '<div class="no-comments">Click any node to add a comment</div>';
+    return;
+  }
+  list.innerHTML = state.comments.map(c => `
+    <div class="comment-item">
+      <button class="comment-del" onclick="deleteComment(${c.id})">×</button>
+      <div class="comment-target">${c.targetLabel}</div>
+      <div class="comment-text">${c.text}</div>
+    </div>
+  `).join('');
+}
+
+// ─── BOTTOM TABS ─────────────────────────────────────────────────────────────
+
+function setTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll('.bottom-tab').forEach(t => t.classList.toggle('active', t.getAttribute('onclick').includes(`'${tab}'`)));
+  renderTab();
+}
+
+function highlightNode(nodeId) {
+  state.highlighted = state.highlighted === nodeId ? null : nodeId;
+  render();
+}
+
+function renderTab() {
+  const el = document.getElementById('tab-content');
+  if (state.tab === 'issues') {
+    el.innerHTML = `<div class="issue-grid">${ISSUES.map(iss => `
+      <div class="issue-card ${iss.severity}">
+        <button class="highlight-btn" onclick="highlightNode('${iss.nodeId}')">Highlight</button>
+        <div class="issue-header">
+          <div class="issue-badge ${iss.severity}">${iss.id}</div>
+          <div class="issue-title">${iss.title}</div>
+        </div>
+        <div class="issue-file">${iss.file}</div>
+        <div class="issue-desc">${iss.desc}</div>
+      </div>
+    `).join('')}</div>`;
+  } else if (state.tab === 'steps') {
+    el.innerHTML = `<div class="step-list">${NEXT_STEPS.map(s => `
+      <div class="step-item${state.stepsDone.includes(s.id) ? ' done' : ''}">
+        <input type="checkbox" class="step-check" ${state.stepsDone.includes(s.id) ? 'checked' : ''} onchange="toggleStep(${s.id}, this.checked)">
+        <div class="step-num">${s.id}</div>
+        <div class="step-text">${s.text} <span class="step-code">${s.code}</span></div>
+      </div>
+    `).join('')}</div>`;
+  } else {
+    el.innerHTML = `
+      <div id="prompt-area">
+        <pre id="prompt-output"></pre>
+        <div class="copy-row"><button id="copy-btn" onclick="copyPrompt()">Copy Prompt</button></div>
+      </div>`;
+    updatePrompt();
+  }
+}
+
+function toggleStep(id, done) {
+  if (done) state.stepsDone = [...new Set([...state.stepsDone, id])];
+  else state.stepsDone = state.stepsDone.filter(i => i !== id);
+  renderTab();
+  updatePrompt();
+}
+
+function updatePrompt() {
+  const el = document.getElementById('prompt-output');
+  if (!el) return;
+
+  const visibleLayers = Object.entries(state.layers).filter(([,v]) => v).map(([k]) => k).join(', ');
+  const activeLayers = Object.values(state.layers).every(Boolean) ? 'all layers' : `${visibleLayers}`;
+  const openIssues = ISSUES.filter(i => !state.stepsDone.includes(i.id));
+  const doneSteps = NEXT_STEPS.filter(s => state.stepsDone.includes(s.id));
+
+  let out = `Context: Investigating auth & API flow in ItemCard → AddToWatchlistButtonNewUI → Shopping Backend Service.\n`;
+  out += `View: ${state.view} diagram showing ${activeLayers}.\n\n`;
+  out += `Critical finding: changeWatchlistHandler.ts:53 calls res.end() with no status when getAccessToken() returns no token.\n`;
+  out += `This results in a 200 empty response — addWatchlistItems() returns { success: true } and the UI incorrectly marks the item as watched.\n\n`;
+
+  if (openIssues.length) {
+    out += `Open issues (${openIssues.length}):\n`;
+    openIssues.forEach(i => { out += `  #${i.id} [${i.severity.toUpperCase()}] ${i.title} — ${i.file}\n`; });
+    out += '\n';
+  }
+
+  if (doneSteps.length) {
+    out += `Addressed (${doneSteps.length}):\n`;
+    doneSteps.forEach(s => { out += `  ✓ Step ${s.id}: ${s.code}\n`; });
+    out += '\n';
+  }
+
+  if (state.comments.length) {
+    out += `Component notes:\n`;
+    state.comments.forEach(c => { out += `\n${c.targetLabel} (${c.targetFile}):\n${c.text}\n`; });
+  }
+
+  el.textContent = out.trim();
+}
+
+function copyPrompt() {
+  const el = document.getElementById('prompt-output');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const btn = document.getElementById('copy-btn');
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy Prompt'; }, 1500); }
+  });
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+
+function render() {
+  if (state.view === 'architecture') renderArchitecture();
+  else renderSequence();
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+
+render();
+renderComments();
+renderTab();
+
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+</script>
+</body>
+</html>
