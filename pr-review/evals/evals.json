@@ -1,0 +1,169 @@
+{
+  "skill_name": "pr-review",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "review my open prs",
+      "expected_output": "Discovers up to 3 open non-draft PRs, presents queue, then reviews each one-at-a-time with AskUserQuestion approval before posting to GitHub via pending review API.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "no-draft-prs",
+          "description": "None of the reviewed PRs are draft PRs",
+          "type": "programmatic"
+        },
+        {
+          "id": "max-three-prs",
+          "description": "At most 3 PRs were reviewed",
+          "type": "programmatic"
+        },
+        {
+          "id": "has-recommendation",
+          "description": "Each review contains a clear APPROVE, REQUEST CHANGES, or COMMENT recommendation",
+          "type": "programmatic"
+        },
+        {
+          "id": "file-references",
+          "description": "At least one review mentions a specific file path from the diff",
+          "type": "programmatic"
+        },
+        {
+          "id": "review-is-specific",
+          "description": "Review content references actual code or logic from the diff, not just generic boilerplate advice",
+          "type": "judgment"
+        },
+        {
+          "id": "user-approval-requested",
+          "description": "AskUserQuestion was used to present each review with Post/Skip/Revise options before any GitHub API call",
+          "type": "programmatic"
+        },
+        {
+          "id": "pending-review-api-used",
+          "description": "Reviews were posted via the two-step gh api pending review pattern (POST /reviews then POST /reviews/{id}/events)",
+          "type": "programmatic"
+        },
+        {
+          "id": "queue-presented",
+          "description": "A list of discovered PRs was shown to the user before individual reviews began",
+          "type": "programmatic"
+        },
+        {
+          "id": "no-html-generated",
+          "description": "No HTML dashboard file was generated or opened",
+          "type": "programmatic"
+        },
+        {
+          "id": "no-six-section-framework",
+          "description": "Review does NOT contain the 6-section framework headers (Architecture & Design, Code Quality, Security, Performance, Test Coverage, Project Conventions)",
+          "type": "programmatic"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "what PRs need my attention in this repo?",
+      "expected_output": "Interprets as PR review task, discovers unreviewed + re-review PRs, presents queue, reviews each one-at-a-time with approval gating.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "no-draft-prs",
+          "description": "None of the reviewed PRs are draft PRs",
+          "type": "programmatic"
+        },
+        {
+          "id": "max-three-prs",
+          "description": "At most 3 PRs were reviewed",
+          "type": "programmatic"
+        },
+        {
+          "id": "has-recommendation",
+          "description": "Each review contains a clear APPROVE, REQUEST CHANGES, or COMMENT recommendation",
+          "type": "programmatic"
+        },
+        {
+          "id": "file-references",
+          "description": "At least one review mentions a specific file path from the diff",
+          "type": "programmatic"
+        },
+        {
+          "id": "review-is-specific",
+          "description": "Review content references actual code or logic from the diff, not just generic boilerplate advice",
+          "type": "judgment"
+        },
+        {
+          "id": "user-approval-requested",
+          "description": "AskUserQuestion was used to present each review with Post/Skip/Revise options before any GitHub API call",
+          "type": "programmatic"
+        },
+        {
+          "id": "pending-review-api-used",
+          "description": "Reviews were posted via the two-step gh api pending review pattern (POST /reviews then POST /reviews/{id}/events)",
+          "type": "programmatic"
+        },
+        {
+          "id": "no-html-generated",
+          "description": "No HTML dashboard file was generated or opened",
+          "type": "programmatic"
+        },
+        {
+          "id": "no-six-section-framework",
+          "description": "Review does NOT contain the 6-section framework headers (Architecture & Design, Code Quality, Security, Performance, Test Coverage, Project Conventions)",
+          "type": "programmatic"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "review the top 3 prs that need a code review",
+      "expected_output": "Finds up to 3 open non-draft PRs, presents queue, reviews each sequentially with approval gating via AskUserQuestion, and posting via pending review API.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "no-draft-prs",
+          "description": "None of the reviewed PRs are draft PRs",
+          "type": "programmatic"
+        },
+        {
+          "id": "max-three-prs",
+          "description": "At most 3 PRs were reviewed",
+          "type": "programmatic"
+        },
+        {
+          "id": "has-recommendation",
+          "description": "Each review contains a clear APPROVE, REQUEST CHANGES, or COMMENT recommendation",
+          "type": "programmatic"
+        },
+        {
+          "id": "file-references",
+          "description": "At least one review mentions a specific file path from the diff",
+          "type": "programmatic"
+        },
+        {
+          "id": "review-is-specific",
+          "description": "Review content references actual code or logic from the diff, not just generic boilerplate advice",
+          "type": "judgment"
+        },
+        {
+          "id": "user-approval-requested",
+          "description": "AskUserQuestion was used to present each review with Post/Skip/Revise options before any GitHub API call",
+          "type": "programmatic"
+        },
+        {
+          "id": "pending-review-api-used",
+          "description": "Reviews were posted via the two-step gh api pending review pattern (POST /reviews then POST /reviews/{id}/events)",
+          "type": "programmatic"
+        },
+        {
+          "id": "no-html-generated",
+          "description": "No HTML dashboard file was generated or opened",
+          "type": "programmatic"
+        },
+        {
+          "id": "no-six-section-framework",
+          "description": "Review does NOT contain the 6-section framework headers (Architecture & Design, Code Quality, Security, Performance, Test Coverage, Project Conventions)",
+          "type": "programmatic"
+        }
+      ]
+    }
+  ]
+}
